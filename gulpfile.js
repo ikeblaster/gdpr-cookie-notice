@@ -53,7 +53,7 @@ gulp.task('sass', function() {
 		.pipe(gulp.dest(config.sass.path.dist));
 });
 
-gulp.task('css2js', function() {
+gulp.task('css2js', ['sass'], function() {
 	return gulp.src(['dist/style.css'])
 		.pipe(css2js({splitOnNewline: false}))
 		.pipe(gulp.dest(config.javascript.path.src));
@@ -62,9 +62,12 @@ gulp.task('css2js', function() {
 gulp.task('javascript', function() {
 	return gulp.src(['node_modules/js-cookie/src/js.cookie.js', 'src/js/templates.js', 'src/js/script.js', 'src/langs/cs.js', 'src/js/style.js'])
 		//.pipe(sourcemaps.init())
-		.pipe(concat('script.js'))
+		.pipe(concat('cookieconsent.js'))
 		.pipe(uglify())
 		//.pipe(sourcemaps.write("./"))
+		.pipe(replace(/^/, "/* cookies consent, v1 */\n"))
+		.pipe(replace(/[^\p{L}\s!-~]/g, function(c) { return '&#' + c.charCodeAt(0) + ';'; })) // accents
+
 		.pipe(gulp.dest(config.javascript.path.dist))
 });
 
@@ -88,7 +91,7 @@ gulp.task('lint',() => {
 
 gulp.task("watch:sass", function() {
 	return gulp.watch(path.join(config.sass.path.src, '**', '*.scss'), function() {
-		return gulp.start('sass').start('css2js').start('javascript');
+		return gulp.start('css2js');
 	}, {read: false})
 });
 
@@ -104,9 +107,6 @@ gulp.task("watch:html", function() {
 	}, {read: false});
 });
 
-gulp.task("dist", function() {
-	return gulp.start('html').start('sass').start('css2js').start('javascript');
-});
 
 gulp.task('default', ['lint'], function() {
 	http.createServer(
@@ -114,8 +114,6 @@ gulp.task('default', ['lint'], function() {
 	).listen(3000);
 
 	console.log('Listening on :3000');
-
-	gulp.start('dist');
 
 	gulp.start('watch:sass');
 	gulp.start('watch:html');

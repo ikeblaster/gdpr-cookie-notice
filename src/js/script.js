@@ -1,7 +1,7 @@
 // Load locales
 var gdprCookieNoticeLocales = {};
 
-function gdprCookieNotice(config) {
+function cookiesConsent(config) {
 	var namespace = 'consent';
 	var pluginPrefix = 'gdpr-cookie-notice';
 	var templates = window[pluginPrefix + '-templates'];
@@ -27,11 +27,11 @@ function gdprCookieNotice(config) {
 				return typeof _Cookies.get(namespace) === "undefined";
 			},
 			get: function(name) {
-				return _Cookies.get(namespace + ":" + name);
+				return _Cookies.get(namespace + "_" + name);
 			},
 			set: function(name, value) {
 				if(!value) {
-					_Cookies.remove(namespace + ":" + name, cookieProps);
+					_Cookies.remove(namespace + "_" + name, cookieProps);
 					
 					// Remove existing cookies which are no longer allowed
 					if(!ConsentSettings.get(name) && config[name]) {
@@ -41,7 +41,7 @@ function gdprCookieNotice(config) {
 					}
 				}
 				else {
-					_Cookies.set(namespace + ":" + name, value, cookieProps);
+					_Cookies.set(namespace + "_" + name, value, cookieProps);
 				}
 			},
 			getAll: function() {
