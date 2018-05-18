@@ -13,15 +13,17 @@ Include the scripts.js and style.css files on your site from the dist folder. In
 
 ```
 gdprCookieNotice({
-  locale: 'en', //This is the default value
-  timeout: 500, //Time until the cookie bar appears
-  expiration: 30, //This is the default value, in days
+  locale: 'cs', //This is the default value
+  timeout: 300, //Time until the cookie bar appears
+  expiration: 90, //This is the default value, in days
   domain: '.yoursite.com', //If you run the same cookie notice on all subdomains, define the main domain starting with a .
-  implicit: true, //Accept cookies on page scroll automatically
   statement: 'https://google.com', //Link to your cookie statement page
-  performance: ['JSESSIONID'], //Cookies in the performance category.
-  analytics: ['ga'], //Cookies in the analytics category.
-  marketing: [SSID'] //Cookies in the marketing category.
+  categories: {
+    essential: true, // always true
+    analytics: true, // always true
+    social: [],
+    marketing: [],
+  }
 });
 ```
 

@@ -42,9 +42,7 @@
 
                 <pre class="language-javascript"><code class="language-javascript">&lt;script type=&quot;text/javascript&quot;&gt;
   document.addEventListener('gdprCookiesEnabled', function (e) {
-    if(e.detail.marketing) { //checks if marketing cookies are enabled
-      //facebook pixel code
-    }
+    // cookies were changed, e.details was removed
   });
 &lt;/script&gt;</code></pre>
 
@@ -72,8 +70,13 @@
     <script>
     cookiesConsent({
 		statement: "zobraz.asp?t=ochrana-osobnich-udaju",
-		analytics: [],
-		social: [],
+		
+		categories: {
+			essential: true, // always true
+			analytics: true, // always true
+			social: [],
+		}
+		
 		//marketing: [],
     });
     </script>

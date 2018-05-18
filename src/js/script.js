@@ -5,17 +5,23 @@ function cookiesConsent(config) {
 	var namespace = 'consent';
 	var pluginPrefix = 'gdpr-cookie-notice';
 	var templates = window[pluginPrefix + '-templates'];
-	var gdprCookies = Cookies.noConflict();
 	var modalLoaded = false;
 	var noticeLoaded = false; 
-	var cookiesAccepted = false;
-	var categories = ['analytics', 'social', 'marketing']; 
 
 	// Default config options
 	if(!config.locale) config.locale = 'cs';
-	if(!config.timeout) config.timeout = 500;
+	if(!config.timeout) config.timeout = 300;
 	if(!config.domain) config.domain = null;
 	if(!config.expiration) config.expiration = 90;
+	
+	if(!config.categories) { 
+		config.categories = { 
+			essential: true, // always true
+			//analytics: [],
+			//social: [],
+			//marketing: [],
+		};
+	}
 	
 	var ConsentSettings = (function(_Cookies) {
 		var cookieProps = { expires: config.expiration, domain: config.domain };
@@ -34,9 +40,9 @@ function cookiesConsent(config) {
 					_Cookies.remove(namespace + "_" + name, cookieProps);
 					
 					// Remove existing cookies which are no longer allowed
-					if(!ConsentSettings.get(name) && config[name]) {
-						for (var ii = 0; ii < config[name].length; ii++) {
-							_Cookies.remove(config[name][ii]);
+					if(!ConsentSettings.get(name) && config.categories[name] instanceof Array) {
+						for (var ii = 0; ii < config.categories[name].length; ii++) {
+							_Cookies.remove(config.categories[name][ii]);
 						}
 					}
 				}
@@ -44,15 +50,8 @@ function cookiesConsent(config) {
 					_Cookies.set(namespace + "_" + name, value, cookieProps);
 				}
 			},
-			getAll: function() {
-				var settings = {};
-				for (var i = 0; i < categories.length; i++) {
-					settings[categories[i]] = ConsentSettings.get(categories[i]);
-				}
-				return settings;				
-			},
 		};
-	})(gdprCookies);
+	})(Cookies.noConflict());
 
 	// Show cookie bar if needed
 	if(ConsentSettings.consentRequired()) {
@@ -68,18 +67,14 @@ function cookiesConsent(config) {
 		
 		// If request was coming from the modal, check for the settings
 		if(fromModal) {
-			for (var i = 0; i < categories.length; i++) {
-				if(config[categories[i]]) {
-					ConsentSettings.set(categories[i], document.getElementById(pluginPrefix + '-cookie_' + categories[i]).checked);
-				}
-			}
+			iterateCategories(true, function(cat){
+				ConsentSettings.set(cat, document.getElementById(pluginPrefix + '-cookie_' + cat).checked);
+			});
 		}
 		else {
-			for (var i = 0; i < categories.length; i++) {
-				if(config[categories[i]]) {
-					ConsentSettings.set(categories[i], byDefaultEnabled);
-				}
-			}
+			iterateCategories(true, function(cat){
+				ConsentSettings.set(cat, byDefaultEnabled);
+			});
 		}
 		
 		dispatchAcceptedCookiesEvent();
@@ -132,25 +127,26 @@ function cookiesConsent(config) {
 		// Get empty category list
 		var categoryList = document.querySelector('.' + pluginPrefix + '-modal-cookies');
 
-		//Load essential cookies
-		categoryList.innerHTML += localizeTemplate('category.html', 'cookie_essential');
-		var input = document.querySelector('.' + pluginPrefix + '-modal-cookie-input');
-		var label = document.querySelector('.' + pluginPrefix + '-modal-cookie-input-switch');
-		label.innerHTML = gdprCookieNoticeLocales[config.locale]['always_on'];
-		label.classList.add(pluginPrefix + '-modal-cookie-state');
-		label.classList.remove(pluginPrefix + '-modal-cookie-input-switch');
-		input.remove();
+		// Load categories if needed
+		iterateCategories(false, function(cat, isEssential){
+			categoryList.innerHTML += localizeTemplate('category.html', 'cookie_' + cat);
+			
+			if(isEssential) {
+				var input = document.getElementById(pluginPrefix + '-cookie_' + cat);
+				var label = document.querySelector('[for=' + pluginPrefix + '-cookie_' + cat + ']');
+				label.innerHTML = gdprCookieNoticeLocales[config.locale]['always_on'];
+				label.classList.add(pluginPrefix + '-modal-cookie-state');
+				label.classList.remove(pluginPrefix + '-modal-cookie-input-switch');
+				input.remove();							
+			}		
+		});
 
-		// Load other categories if needed
-		for (var i = 0; i < categories.length; i++) {
-			if(config[categories[i]]) categoryList.innerHTML += localizeTemplate('category.html', 'cookie_' + categories[i]);
-		}
 		
 		// Update checkboxes based on stored info(if any)
 		if(!ConsentSettings.consentRequired()) {
-			for (var i = 0; i < categories.length; i++) {
-				if(config[categories[i]]) document.getElementById(pluginPrefix + '-cookie_' + categories[i]).checked = ConsentSettings.get(categories[i]);
-			}
+			iterateCategories(true, function(cat){
+				document.getElementById(pluginPrefix + '-cookie_' + cat).checked = ConsentSettings.get(cat);
+			});
 		}
 		
 		// Load click functions
@@ -171,9 +167,20 @@ function cookiesConsent(config) {
 		document.documentElement.classList.remove(pluginPrefix + '-show-modal');
 	}
 	
+	// iterate through categories
+	function iterateCategories(onlyNonEssential, callback) {
+		for (var cat in config.categories) {
+			var isEssential = (config.categories[cat] === true);
+			
+			if (config.categories.hasOwnProperty(cat) && (!onlyNonEssential || !isEssential)) {
+				callback(cat, isEssential);
+			}
+		}
+	}
+	
 	// Load marketing scripts that only works when cookies are accepted
 	function dispatchAcceptedCookiesEvent() {
-		cookiesAcceptedEvent = new CustomEvent('gdprCookiesEnabled', {detail: ConsentSettings.getAll()});
+		cookiesAcceptedEvent = new CustomEvent('gdprCookiesEnabled');
 		document.dispatchEvent(cookiesAcceptedEvent);
 	}
 	
@@ -242,21 +249,9 @@ function cookiesConsent(config) {
 
 		closeButton.addEventListener('click', function() {
 			hideModal();
-			return false;
+			return false; 
 		});
-
-		statementButton.addEventListener('click', function(e) {
-			e.preventDefault();
-			window.location.href = config.statement;
-		});
-
-		for (var i = 0; i < categoryTitles.length; i++) {
-			categoryTitles[i].addEventListener('click', function() {
-				this.parentNode.parentNode.classList.toggle('open');
-				return false;
-			});
-		}
-
+		
 		saveButton.addEventListener('click', function(e) {
 			e.preventDefault();
 			saveButton.classList.add('saved');
@@ -265,6 +260,15 @@ function cookiesConsent(config) {
 			}, 1000);
 			saveSettings(true);
 		});
+		
+		statementButton.href = config.statement;
+		
+		for (var i = 0; i < categoryTitles.length; i++) {
+			categoryTitles[i].addEventListener('click', function() {
+				this.parentNode.parentNode.classList.toggle('open');
+				return false;
+			});
+		}
 
 	}
 
