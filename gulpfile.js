@@ -28,7 +28,12 @@ var config = {
             src: path.join('src/sass'),
             dist: path.join('dist')
         }
-    }
+    },
+    html: {
+        path: {
+            src: path.join('src/html')
+        }
+    },
 };
 
 var onJSError = function (err) {
@@ -48,7 +53,7 @@ gulp.task('styles:sass', function () {
 });
 
 gulp.task('javascript', function () {
-    return gulp.src(['node_modules/js-cookie/src/js.cookie.js', 'src/js/templates.js','src/js/script.js', 'src/langs/en.js',])
+    return gulp.src(['node_modules/js-cookie/src/js.cookie.js', 'src/js/templates.js','src/js/script.js', 'src/langs/cs.js',])
     .pipe(sourcemaps.init())
     .pipe(concat('script.js'))
     .pipe(uglify())
@@ -57,19 +62,24 @@ gulp.task('javascript', function () {
 });
 
 gulp.task("watch:sass", function () {
-    var paths = path.join(config.sass.path.src, '**', '*.scss');
-    return gulp.watch(paths, function () {
+    return gulp.watch(path.join(config.sass.path.src, '**', '*.scss'), function () {
         return gulp.start('styles:sass');
     }, {read: false})
 });
 
 gulp.task("watch:javascript", function () {
-    return watch(path.join(config.javascript.path.src, '**', '*.js'), function () {
+    return watch(path.join('src', '**', '*.js'), function () {
         return gulp.start('javascript');
     }, {read: false});
 });
 
-gulp.task('views:compile', function () {
+gulp.task("watch:html", function () {
+    return watch(path.join(config.html.path.src, '**', '*.html'), function () {
+        return gulp.start('html');
+    }, {read: false});
+});
+
+gulp.task('html', function () {
     gulp.src('src/html/*.html')
     .pipe(html2js('templates.js', {
       adapter: 'javascript',
@@ -94,6 +104,6 @@ gulp.task('default', ['lint'], function () {
     console.log('Listening on :3000');
 
     gulp.start('watch:sass');
-    gulp.start('views:compile');
+    gulp.start('watch:html');
     gulp.start('watch:javascript');
 });

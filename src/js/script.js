@@ -2,304 +2,275 @@
 var gdprCookieNoticeLocales = {};
 
 function gdprCookieNotice(config) {
-  var namespace = 'gdprcookienotice';
-  var pluginPrefix = 'gdpr-cookie-notice';
-  var templates = window[pluginPrefix+'-templates'];
-  var gdprCookies = Cookies.noConflict();
-  var modalLoaded = false;
-  var noticeLoaded = false;
-  var cookiesAccepted = false;
-  var categories = ['performance', 'analytics', 'marketing'];
+	var namespace = 'cookieconsent';
+	var pluginPrefix = 'gdpr-cookie-notice';
+	var templates = window[pluginPrefix+'-templates'];
+	var gdprCookies = Cookies.noConflict();
+	var modalLoaded = false;
+	var noticeLoaded = false; 
+	var cookiesAccepted = false;
+	var categories = ['analytics', 'social', 'marketing']; 
 
-  // Default config options
-  if(!config.locale) config.locale = 'en';
-  if(!config.timeout) config.timeout = 500;
-  if(!config.domain) config.domain = null;
-  if(!config.expiration) config.expiration = 30;
+	// Default config options
+	if(!config.locale) config.locale = 'cs';
+	if(!config.timeout) config.timeout = 500;
+	if(!config.domain) config.domain = null;
+	if(!config.expiration) config.expiration = 30;
 
-  // Get the users current cookie selection
-  var currentCookieSelection = getCookie();
-  var cookiesAcceptedEvent = new CustomEvent('gdprCookiesEnabled', {detail: currentCookieSelection});
+	// Get the users current cookie selection
+	var currentCookieSelection = getCookie();
+	var cookiesAcceptedEvent = new CustomEvent('gdprCookiesEnabled', {detail: currentCookieSelection});
 
-  // Show cookie bar if needed
-  if(!currentCookieSelection) {
-    showNotice();
+	// Show cookie bar if needed
+	if(!currentCookieSelection) {
+		showNotice();
+	} else {
+		//deleteCookies(currentCookieSelection);
+		document.dispatchEvent(cookiesAcceptedEvent);
+	}
 
-    // Accept cookies on page scroll
-    if(config.implicit) {
-      acceptOnScroll();
-    }
-  } else {
-    deleteCookies(currentCookieSelection);
-    document.dispatchEvent(cookiesAcceptedEvent);
-  }
+	// Get gdpr cookie notice stored value
+	function getCookie() {
+		return gdprCookies.getJSON(namespace);
+	}
 
-  // Get gdpr cookie notice stored value
-  function getCookie() {
-    return gdprCookies.getJSON(namespace);
-  }
+	// Delete cookies if needed
+	function deleteCookies(savedCookies) {
+		for (var i = 0; i < categories.length; i++) {
+			if(!savedCookies[categories[i]] && config[categories[i]]) {
+				for (var ii = 0; ii < config[categories[i]].length; ii++) {
+					gdprCookies.remove(config[categories[i]][ii]);
+				}
+			}
+		}
+	}
 
-  // Delete cookies if needed
-  function deleteCookies(savedCookies) {
-    var notAllEnabled = false;
-    for (var i = 0; i < categories.length; i++) {
-      if(config[categories[i]] && !savedCookies[categories[i]]) {
-        for (var ii = 0; ii < config[categories[i]].length; ii++) {
-          gdprCookies.remove(config[categories[i]][ii]);
-          notAllEnabled = true;
-        }
-      }
-    }
+	// Hide cookie notice bar
+	function hideNotice() {
+		document.documentElement.classList.remove(pluginPrefix+'-loaded');
+	}
 
-    // Show the notice if not all categories are enabled
-    if(notAllEnabled) {
-      showNotice();
-    } else {
-      hideNotice();
-    }
-  }
+	// Write gdpr cookie notice's cookies when user accepts cookies
+	function saveSettings(fromModal, byDefaultEnabled) {
+		var settings = {};
+		var cookieProps = { expires: config.expiration, domain: config.domain };
 
-  // Hide cookie notice bar
-  function hideNotice() {
-    document.documentElement.classList.remove(pluginPrefix+'-loaded');
-  }
+		// If request was coming from the modal, check for the settings
+		if(fromModal) {
+			for (var i = 0; i < categories.length; i++) {
+				if(config[categories[i]]) settings[categories[i]] = document.getElementById(pluginPrefix+'-cookie_'+categories[i]).checked;
+			}
+		}
+		else {
+			for (var i = 0; i < categories.length; i++) {
+				if(config[categories[i]]) settings[categories[i]] = byDefaultEnabled;
+			}
+		}
+		
+		for (var val in settings) {
+			if(settings[val]) {
+				gdprCookies.set(namespace+"_"+val, settings[val], cookieProps);
+			}
+			else {
+				gdprCookies.remove(namespace+"_"+val);
+			}
+		}
+		
+		
+		settings.date = new Date();
+		
+		gdprCookies.set(namespace, settings, cookieProps);
+		deleteCookies(settings);
 
-  // Write gdpr cookie notice's cookies when user accepts cookies
-  function acceptCookies(save) {
-    var value = {
-      date: new Date(),
-      necessary: true,
-      performance: true,
-      analytics: true,
-      marketing: true
-    };
+		// Load marketing scripts that only works when cookies are accepted
+		cookiesAcceptedEvent = new CustomEvent('gdprCookiesEnabled', {detail: settings});
+		document.dispatchEvent(cookiesAcceptedEvent);
+		
+		hideNotice();
+	}
 
-    // If request was coming from the modal, check for the settings
-    if(save) {
-      for (var i = 0; i < categories.length; i++) {
-        value[categories[i]] = document.getElementById(pluginPrefix+'-cookie_'+categories[i]).checked;
-      }
-    }
-    gdprCookies.set(namespace, value, { expires: config.expiration, domain: config.domain });
-    deleteCookies(value);
+	// Show the cookie bar
+	function buildNotice() {
+		if(noticeLoaded) {
+			return false;
+		}
 
-    // Load marketing scripts that only works when cookies are accepted
-    cookiesAcceptedEvent = new CustomEvent('gdprCookiesEnabled', {detail: value});
-    document.dispatchEvent(cookiesAcceptedEvent);
+		var noticeHtml = localizeTemplate('bar.html');
+		document.body.insertAdjacentHTML('beforeend', noticeHtml);
 
-  }
+		// Load click functions
+		setNoticeEventListeners();
 
-  // Show the cookie bar
-  function buildNotice() {
-    if(noticeLoaded) {
-      return false;
-    }
+		// Make sure its only loaded once
+		noticeLoaded = true;
+	}
 
-    var noticeHtml = localizeTemplate('bar.html');
-    document.body.insertAdjacentHTML('beforeend', noticeHtml);
+	// Show the cookie notice
+	function showNotice() {
+		buildNotice();
 
-    // Load click functions
-    setNoticeEventListeners();
+		// Show the notice with a little timeout
+		setTimeout(function(){
+			document.documentElement.classList.add(pluginPrefix+'-loaded');
+		}, config.timeout);
+	}
 
-    // Make sure its only loaded once
-    noticeLoaded = true;
-  }
+	// Localize templates
+	function localizeTemplate(template, prefix) {
+		var str = templates[template];
+		var data = gdprCookieNoticeLocales[config.locale];
 
-  // Show the cookie notice
-  function showNotice() {
-    buildNotice();
+		if(prefix) {
+			prefix = prefix+'_';
+		} else {
+			prefix = '';
+		}
 
-    // Show the notice with a little timeout
-    setTimeout(function(){
-      document.documentElement.classList.add(pluginPrefix+'-loaded');
-    }, config.timeout);
-  }
+		if (typeof str === 'string' && (data instanceof Object)) {
+			for (var key in data) {
+				return str.replace(/({([^}]+)})/g, function(i) {
+					var key = i.replace(/{/, '').replace(/}/, '');
 
-  // Localize templates
-  function localizeTemplate(template, prefix) {
-    var str = templates[template];
-    var data = gdprCookieNoticeLocales[config.locale];
+					if(key == 'prefix') {
+						return prefix.slice(0, -1);
+					}
 
-    if(prefix) {
-      prefix = prefix+'_';
-    } else {
-      prefix = '';
-    }
+					if(data[key]) {
+						return data[key];
+					} else if(data[prefix+key]) {
+						return data[prefix+key];
+					} else {
+						return i;
+					}
+				});
+			}
+		} else {
+			return false;
+		}
+	}
 
-    if (typeof str === 'string' && (data instanceof Object)) {
-      for (var key in data) {
-        return str.replace(/({([^}]+)})/g, function(i) {
-          var key = i.replace(/{/, '').replace(/}/, '');
+	// Build modal window
+	function buildModal() {
+		if(modalLoaded) {
+			return false;
+		}
 
-          if(key == 'prefix') {
-            return prefix.slice(0, -1);
-          }
+		// Load modal template
+		var modalHtml = localizeTemplate('modal.html');
 
-          if(data[key]) {
-            return data[key];
-          } else if(data[prefix+key]) {
-            return data[prefix+key];
-          } else {
-            return i;
-          }
-        });
-      }
-    } else {
-      return false;
-    }
-  }
+		// Append modal into body
+		document.body.insertAdjacentHTML('beforeend', modalHtml);
 
-  // Build modal window
-  function buildModal() {
-    if(modalLoaded) {
-      return false;
-    }
+		// Get empty category list
+		var categoryList = document.querySelector('.'+pluginPrefix+'-modal-cookies');
 
-    // Load modal template
-    var modalHtml = localizeTemplate('modal.html');
+		//Load essential cookies
+		categoryList.innerHTML += localizeTemplate('category.html', 'cookie_essential');
+		var input = document.querySelector('.'+pluginPrefix+'-modal-cookie-input');
+		var label = document.querySelector('.'+pluginPrefix+'-modal-cookie-input-switch');
+		label.innerHTML = gdprCookieNoticeLocales[config.locale]['always_on'];
+		label.classList.add(pluginPrefix+'-modal-cookie-state');
+		label.classList.remove(pluginPrefix+'-modal-cookie-input-switch');
+		input.remove();
 
-    // Append modal into body
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
+		// Load other categories if needed
+		for (var i = 0; i < categories.length; i++) {
+			if(config[categories[i]]) categoryList.innerHTML += localizeTemplate('category.html', 'cookie_' + categories[i]);
+		}
+		
+		// Update checkboxes based on stored info(if any)
+		if(currentCookieSelection) {
+			for (var i = 0; i < categories.length; i++) {
+				if(config[categories[i]]) document.getElementById(pluginPrefix+'-cookie_'+categories[i]).checked = currentCookieSelection[categories[i]];
+			}
+		}
+		
+		// Load click functions
+		setModalEventListeners();
 
-    // Get empty category list
-    var categoryList = document.querySelector('.'+pluginPrefix+'-modal-cookies');
+		// Make sure modal is only loaded once
+		modalLoaded = true;
+	}
 
-    //Load essential cookies
-    categoryList.innerHTML += localizeTemplate('category.html', 'cookie_essential');
-    var input = document.querySelector('.'+pluginPrefix+'-modal-cookie-input');
-    var label = document.querySelector('.'+pluginPrefix+'-modal-cookie-input-switch');
-    label.innerHTML = gdprCookieNoticeLocales[config.locale]['always_on'];
-    label.classList.add(pluginPrefix+'-modal-cookie-state');
-    label.classList.remove(pluginPrefix+'-modal-cookie-input-switch');
-    input.remove();
+	// Show modal window
+	function showModal() {
+		buildModal();
+		document.documentElement.classList.add(pluginPrefix+'-show-modal');
+	}
 
-    // Load other categories if needed
-    if(config.performance) categoryList.innerHTML += localizeTemplate('category.html', 'cookie_performance');
-    if(config.analytics) categoryList.innerHTML += localizeTemplate('category.html', 'cookie_analytics');
-    if(config.marketing) categoryList.innerHTML += localizeTemplate('category.html', 'cookie_marketing');
+	// Hide modal window
+	function hideModal() {
+		document.documentElement.classList.remove(pluginPrefix+'-show-modal');
+	}
 
-    // Load click functions
-    setModalEventListeners();
+	// Click functions in the notice
+	function setNoticeEventListeners() {
+		var settingsButton = document.querySelectorAll('.'+pluginPrefix+'-nav-item-settings')[0];
+		var acceptButton = document.querySelectorAll('.'+pluginPrefix+'-nav-item-accept')[0];
+		var rejectButton = document.querySelectorAll('.'+pluginPrefix+'-nav-item-reject')[0];
 
-    // Update checkboxes based on stored info(if any)
-    if(currentCookieSelection) {
-      document.getElementById(pluginPrefix+'-cookie_performance').checked = currentCookieSelection.performance;
-      document.getElementById(pluginPrefix+'-cookie_analytics').checked = currentCookieSelection.analytics;
-      document.getElementById(pluginPrefix+'-cookie_marketing').checked = currentCookieSelection.marketing;
-    }
+		settingsButton.addEventListener('click', function(e) {
+			e.preventDefault();
+			showModal();
+		});
 
-    // Make sure modal is only loaded once
-    modalLoaded = true;
-  }
+		acceptButton.addEventListener('click', function(e) {
+			e.preventDefault();
+			saveSettings(false, true);
+		});
 
-  // Show modal window
-  function showModal() {
-    buildModal();
-    document.documentElement.classList.add(pluginPrefix+'-show-modal');
-  }
+		rejectButton.addEventListener('click', function(e) {
+			e.preventDefault();
+			saveSettings(false, false);
+		});
 
-  // Hide modal window
-  function hideModal() {
-    document.documentElement.classList.remove(pluginPrefix+'-show-modal');
-  }
+	}
 
-  // Click functions in the notice
-  function setNoticeEventListeners() {
-    var settingsButton = document.querySelectorAll('.'+pluginPrefix+'-nav-item-settings')[0];
-    var acceptButton = document.querySelectorAll('.'+pluginPrefix+'-nav-item-accept')[0];
+	// Click functions in the modal
+	function setModalEventListeners() {
+		var closeButton = document.querySelectorAll('.'+pluginPrefix+'-modal-close')[0];
+		var statementButton = document.querySelectorAll('.'+pluginPrefix+'-modal-footer-item-statement')[0];
+		var categoryTitles = document.querySelectorAll('.'+pluginPrefix+'-modal-cookie-title');
+		var saveButton = document.querySelectorAll('.'+pluginPrefix+'-modal-footer-item-save')[0];
 
-    settingsButton.addEventListener('click', function(e) {
-      e.preventDefault();
-      showModal();
-    });
+		closeButton.addEventListener('click', function() {
+			hideModal();
+			return false;
+		});
 
-    acceptButton.addEventListener('click', function(e) {
-      e.preventDefault();
-      acceptCookies();
-    });
+		statementButton.addEventListener('click', function(e) {
+			e.preventDefault();
+			window.location.href = config.statement;
+		});
 
-  }
+		for (var i = 0; i < categoryTitles.length; i++) {
+			categoryTitles[i].addEventListener('click', function() {
+				this.parentNode.parentNode.classList.toggle('open');
+				return false;
+			});
+		}
 
-  // Click functions in the modal
-  function setModalEventListeners() {
-    var closeButton = document.querySelectorAll('.'+pluginPrefix+'-modal-close')[0];
-    var statementButton = document.querySelectorAll('.'+pluginPrefix+'-modal-footer-item-statement')[0];
-    var categoryTitles = document.querySelectorAll('.'+pluginPrefix+'-modal-cookie-title');
-    var saveButton = document.querySelectorAll('.'+pluginPrefix+'-modal-footer-item-save')[0];
+		saveButton.addEventListener('click', function(e) {
+			e.preventDefault();
+			saveButton.classList.add('saved');
+			setTimeout(function(){
+				saveButton.classList.remove('saved');
+			}, 1000);
+			saveSettings(true);
+		});
 
-    closeButton.addEventListener('click', function() {
-      hideModal();
-      return false;
-    });
+	}
 
-    statementButton.addEventListener('click', function(e) {
-      e.preventDefault();
-      window.location.href = config.statement;
-    });
+	// Settings button on the page somewhere
+	var globalSettingsButton = document.querySelectorAll('.'+pluginPrefix+'-settings-button');
+	if(globalSettingsButton) {
+		for (var i = 0; i < globalSettingsButton.length; i++) {
+			globalSettingsButton[i].addEventListener('click', function(e) {
+				e.preventDefault();
+				showModal();
+			});
+		}
+	}
 
-    for (var i = 0; i < categoryTitles.length; i++) {
-      categoryTitles[i].addEventListener('click', function() {
-        this.parentNode.parentNode.classList.toggle('open');
-        return false;
-      });
-    }
-
-    saveButton.addEventListener('click', function(e) {
-      e.preventDefault();
-      saveButton.classList.add('saved');
-      setTimeout(function(){
-        saveButton.classList.remove('saved');
-      }, 1000);
-      acceptCookies(true);
-    });
-
-  }
-
-  // Settings button on the page somewhere
-  var globalSettingsButton = document.querySelectorAll('.'+pluginPrefix+'-settings-button');
-  if(globalSettingsButton) {
-    for (var i = 0; i < globalSettingsButton.length; i++) {
-      globalSettingsButton[i].addEventListener('click', function(e) {
-        e.preventDefault();
-        showModal();
-      });
-    }
-  }
-
-
-  // Get document height
-  function getDocHeight() {
-    var D = document;
-    return Math.max(
-      D.body.scrollHeight, D.documentElement.scrollHeight,
-      D.body.offsetHeight, D.documentElement.offsetHeight,
-      D.body.clientHeight, D.documentElement.clientHeight
-    );
-  }
-
-  // Check if at least page is 25% scrolled down
-  function amountScrolled(){
-    var winheight= window.innerHeight || (document.documentElement || document.body).clientHeight;
-    var docheight = getDocHeight();
-    var scrollTop = window.pageYOffset || (document.documentElement || document.body.parentNode || document.body).scrollTop;
-    var trackLength = docheight - winheight;
-    var pctScrolled = Math.floor(scrollTop/trackLength * 100); // gets percentage scrolled (ie: 80 or NaN if tracklength == 0)
-    if(pctScrolled > 25 && !cookiesAccepted) {
-      cookiesAccepted = true;
-      return true;
-    } else {
-      return false;
-    }
-  }
-
-  // Accept cookies on scroll
-  function acceptOnScroll() {
-    window.addEventListener('scroll', function _listener() {
-      if(amountScrolled()) {
-        acceptCookies();
-        window.removeEventListener('click', _listener);
-      }
-    });
-  }
 
 }
