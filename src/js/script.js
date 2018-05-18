@@ -19,10 +19,9 @@ function gdprCookieNotice(config) {
 	
 	var ConsentSettings = (function(_Cookies) {
 		var cookieProps = { expires: config.expiration, domain: config.domain };
-		
 		return {
 			init: function() {
-				_Cookies.set(namespace, new Date(), cookieProps);
+				_Cookies.set(namespace, (new Date()).valueOf(), cookieProps);
 			},
 			consentRequired: function() {
 				return typeof _Cookies.get(namespace) === "undefined";
@@ -33,6 +32,13 @@ function gdprCookieNotice(config) {
 			set: function(name, value) {
 				if(!value) {
 					_Cookies.remove(namespace + ":" + name, cookieProps);
+					
+					// Remove existing cookies which are no longer allowed
+					if(!ConsentSettings.get(name) && config[name]) {
+						for (var ii = 0; ii < config[name].length; ii++) {
+							_Cookies.remove(config[name][ii]);
+						}
+					}
 				}
 				else {
 					_Cookies.set(namespace + ":" + name, value, cookieProps);
@@ -40,44 +46,26 @@ function gdprCookieNotice(config) {
 			},
 			getAll: function() {
 				var settings = {};
-				
 				for (var i = 0; i < categories.length; i++) {
-					settings[categories[i]] = _Cookies.get(namespace + ":" + categories[i]);
+					settings[categories[i]] = ConsentSettings.get(categories[i]);
 				}
-				
 				return settings;				
-			}
+			},
 		};
 	})(gdprCookies);
-
 
 	// Show cookie bar if needed
 	if(ConsentSettings.consentRequired()) {
 		showNotice();
 	} else {
-		//deleteRejectedCookies();
-		
-		// Get the users current cookie selection
-		var cookiesAcceptedEvent = new CustomEvent('gdprCookiesEnabled', {detail: ConsentSettings.getAll()});
-		document.dispatchEvent(cookiesAcceptedEvent);
-	}
-
-	// Delete cookies if needed
-	function deleteRejectedCookies() {
-		for (var i = 0; i < categories.length; i++) {
-			var cat = categories[i];
-		
-			if(!ConsentSettings.get(cat) && config[cat]) {
-				for (var ii = 0; ii < config[cat].length; ii++) {
-					gdprCookies.remove(config[cat][ii]);
-				}
-			}
-		}
+		dispatchAcceptedCookiesEvent();
 	}
 
 	// Write gdpr cookie notice's cookies when user accepts cookies
 	function saveSettings(fromModal, byDefaultEnabled) {
 
+		ConsentSettings.init();
+		
 		// If request was coming from the modal, check for the settings
 		if(fromModal) {
 			for (var i = 0; i < categories.length; i++) {
@@ -94,13 +82,7 @@ function gdprCookieNotice(config) {
 			}
 		}
 		
-		deleteRejectedCookies();
-		ConsentSettings.init();
-
-		// Load marketing scripts that only works when cookies are accepted
-		cookiesAcceptedEvent = new CustomEvent('gdprCookiesEnabled', {detail: ConsentSettings.getAll()});
-		document.dispatchEvent(cookiesAcceptedEvent);
-		
+		dispatchAcceptedCookiesEvent();
 		hideNotice();
 	}
 
@@ -187,6 +169,12 @@ function gdprCookieNotice(config) {
 	// Hide modal window
 	function hideModal() {
 		document.documentElement.classList.remove(pluginPrefix + '-show-modal');
+	}
+	
+	// Load marketing scripts that only works when cookies are accepted
+	function dispatchAcceptedCookiesEvent() {
+		cookiesAcceptedEvent = new CustomEvent('gdprCookiesEnabled', {detail: ConsentSettings.getAll()});
+		document.dispatchEvent(cookiesAcceptedEvent);
 	}
 	
 	// Localize templates
