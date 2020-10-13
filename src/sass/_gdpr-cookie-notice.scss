@@ -16,10 +16,13 @@ $icon_checkmark: 'data:image/svg+xml;utf8,<svg height="11" viewBox="0 0 14 11" w
 $icon_caret: 'data:image/svg+xml;utf8,<svg height="12" viewBox="0 0 8 12" width="8" xmlns="http://www.w3.org/2000/svg"><path d="m1.41 0-1.41 1.41 4.58 4.59-4.58 4.59 1.41 1.41 6-6z" fill="'+$modal_primary+'"/></svg>';
 
 .gdpr-cookie-cssreset {
-    font-weight: normal;
-	font-size: 16px;
-    line-height: 1.6;
-	font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu !important;
+	* {
+		padding: 0;
+		font-weight: normal;
+		font-size: 16px;
+		line-height: 1.6;
+		font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu !important;
+	}
 	
 	a:hover {
 		opacity: 0.75 !important;
